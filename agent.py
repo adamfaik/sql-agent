@@ -5,6 +5,7 @@ from typing import TypedDict, List, Annotated
 from operator import add
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, START, END
 
 # 1. Load environment variables from the .env file (API keys)
 load_dotenv()
@@ -153,24 +154,66 @@ def summarize_results(state: AgentState) -> dict:
     print("✓ Summary successfully generated.\n")
     return {"summary": summary}
 
-# 6. Quick Test Block
+# 6. Define the Routing Logic (Conditional Edge)
+def check_for_errors(state: AgentState) -> str:
+    """
+    Decides where the agent should go next after executing the SQL.
+    If there is an error, route back to the SQL Generator to fix it.
+    If successful, route to the Summarizer.
+    """
+    error = state.get("error")
+    if error:
+        print("--- ROUTING: ERROR DETECTED, RETRYING SQL GENERATION ---")
+        return "generate_sql"
+    else:
+        print("--- ROUTING: SUCCESS, PROCEEDING TO SUMMARY ---")
+        return "summarize_results"
+
+# 7. Build and Compile the Graph
+def create_graph():
+    """
+    Assembles the individual nodes and edges into a compiled LangGraph workflow.
+    """
+    # Initialize the graph with our custom State
+    workflow = StateGraph(AgentState)
+    
+    # Add our three nodes
+    workflow.add_node("generate_sql", generate_sql)
+    workflow.add_node("execute_sql", execute_sql)
+    workflow.add_node("summarize_results", summarize_results)
+    
+    # Define the execution flow
+    workflow.add_edge(START, "generate_sql")
+    workflow.add_edge("generate_sql", "execute_sql")
+    
+    # Add the conditional routing after DB execution
+    workflow.add_conditional_edges(
+        "execute_sql",
+        check_for_errors,
+        {
+            "generate_sql": "generate_sql",           # Loop back on error
+            "summarize_results": "summarize_results"  # Move forward on success
+        }
+    )
+    
+    workflow.add_edge("summarize_results", END)
+    
+    # Compile the graph into an executable application
+    return workflow.compile()
+
+# 8. Quick Test Block
 if __name__ == "__main__":
-    # Simulate an initial user question
-    test_state = {"query": "How many customers are there in the city of 'sao paulo'?"}
+    # Initialize the compiled LangGraph agent
+    agent_graph = create_graph()
     
-    # 1. Run Node 1 (Generate SQL)
-    state_after_sql = generate_sql(test_state)
-    test_state.update(state_after_sql)
+    # We ask a trick question: the schema DOES NOT have a customer "name" column.
+    # This should force the LLM to make a mistake, triggering the self-correction loop!
+    test_state = {"query": "Can you give me the names of 3 customers from sao paulo?"}
     
-    # 2. Run Node 2 (Execute SQL)
-    state_after_db = execute_sql(test_state)
-    test_state.update(state_after_db)
+    print("🚀 Starting the agentic workflow...\n")
     
-    # 3. Run Node 3 (Summarize)
-    if not test_state.get("error"):  # Only summarize if there's no SQL error
-        state_after_summary = summarize_results(test_state)
-        test_state.update(state_after_summary)
+    # Invoke the graph
+    final_state = agent_graph.invoke(test_state)
     
-    # Print the final business answer
-    print("FINAL BUSINESS ANSWER:")
-    print(test_state.get("summary"))
+    print("\n=== FINAL BUSINESS ANSWER ===")
+    print(final_state.get("summary"))
