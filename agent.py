@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from dotenv import load_dotenv
 from typing import TypedDict, List, Annotated
 from operator import add
@@ -74,10 +75,102 @@ def generate_sql(state: AgentState) -> dict:
     # Return the updated state
     return {"sql_query": generated_sql}
 
-# 4. Quick Test Block
+# 4. Define Node 2: Database Executor
+def execute_sql(state: AgentState) -> dict:
+    """
+    Node 2: Executes the generated SQL query against the SQLite database.
+    If it succeeds, it returns the data. If it fails, it returns the exact SQL error.
+    """
+    print("--- NODE: EXECUTING SQL ---")
+    query = state.get("sql_query")
+    
+    if not query:
+        return {"error": "No SQL query was generated."}
+        
+    try:
+        # Connect to the local SQLite database
+        conn = sqlite3.connect("olist.db")
+        cursor = conn.cursor()
+        
+        # Execute the SQL query
+        cursor.execute(query)
+        
+        # Fetch results (limiting to 100 to avoid blowing up the LLM context later)
+        results = cursor.fetchmany(100)
+        
+        # Extract column names for better readability
+        column_names = [description[0] for description in cursor.description]
+        conn.close()
+        
+        # Format the output
+        if not results:
+            formatted_results = "No results found."
+        else:
+            formatted_results = f"Columns: {', '.join(column_names)}\nData:\n"
+            for row in results:
+                formatted_results += str(row) + "\n"
+                
+        print("✓ Execution successful. Data fetched.\n")
+        # Return the results and clear any previous errors
+        return {"db_results": formatted_results, "error": ""}
+        
+    except Exception as e:
+        # If SQLite throws an error (e.g., column doesn't exist, syntax error)
+        error_msg = f"SQLite Error: {str(e)}"
+        print(f"✗ Execution failed! {error_msg}\n")
+        return {"error": error_msg}
+
+# 5. Define Node 3: Synthesizer / Summarizer
+def summarize_results(state: AgentState) -> dict:
+    """
+    Node 3: Takes the raw database results and translates them into a 
+    clear, business-friendly summary using the LLM.
+    """
+    print("--- NODE: SUMMARIZING RESULTS ---")
+    question = state.get("query")
+    raw_data = state.get("db_results")
+    error = state.get("error")
+    
+    # If there's an error and we ended up here somehow, handle it
+    if error:
+        return {"summary": f"I couldn't answer the question due to an error: {error}"}
+        
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    
+    system_prompt = """You are a helpful business data analyst. 
+    You are provided with a user's original question and the raw data results from a SQL database.
+    Your job is to write a clear, concise, and professional answer to the user's question based ONLY on the provided data.
+    Do not mention SQL, databases, or raw formatting in your answer. Provide a direct natural language response."""
+    
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Question: {question}\n\nRaw Data:\n{raw_data}")
+    ]
+    
+    response = llm.invoke(messages)
+    summary = response.content.strip()
+    
+    print("✓ Summary successfully generated.\n")
+    return {"summary": summary}
+
+# 6. Quick Test Block
 if __name__ == "__main__":
-    # We simulate an initial state with a simple question
+    # Simulate an initial user question
     test_state = {"query": "How many customers are there in the city of 'sao paulo'?"}
     
-    # Run the node
-    new_state = generate_sql(test_state)
+    # 1. Run Node 1 (Generate SQL)
+    state_after_sql = generate_sql(test_state)
+    test_state.update(state_after_sql)
+    
+    # 2. Run Node 2 (Execute SQL)
+    state_after_db = execute_sql(test_state)
+    test_state.update(state_after_db)
+    
+    # 3. Run Node 3 (Summarize)
+    if not test_state.get("error"):  # Only summarize if there's no SQL error
+        state_after_summary = summarize_results(test_state)
+        test_state.update(state_after_summary)
+    
+    # Print the final business answer
+    print("FINAL BUSINESS ANSWER:")
+    print(test_state.get("summary"))
