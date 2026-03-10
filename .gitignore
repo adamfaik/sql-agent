@@ -6,3 +6,6 @@ schema.txt
 # Ignore Python cache
 __pycache__/
 *.pyc
+
+# Ignore Mac system files
+*.DS_Store
