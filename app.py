@@ -55,14 +55,22 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
                 if node_name == "reformulate_query":
                     status.write("⏳ Reformulation de la question...")
                     
-                elif node_name == "validate_query":
-                    is_answerable = node_state.get("is_answerable")
-                    if is_answerable:
-                        status.write("✅ Requête valide. Données présentes dans le schéma.")
+                elif node_name == "classify_query":
+                    complexity = node_state.get("query_complexity")
+                    reason = node_state.get("classification_reason")
+                    
+                    if complexity == "out_of_scope":
+                        status.error(f"❌ Requête hors périmètre : {reason}")
+                        final_summary = reason
+                    elif complexity == "complex":
+                        status.warning("🧠 Requête complexe détectée. Activation de l'architecte SQL...")
                     else:
-                        status.error("❌ Requête rejetée : Hors périmètre.")
-                        # On capture la raison du refus pour l'afficher à l'utilisateur
-                        final_summary = node_state.get("validation_reason", "Désolé, je ne peux pas répondre à cette question.")
+                        status.success("✅ Requête simple détectée. Traitement direct...")
+                        
+                elif node_name == "plan_sql_query":
+                    status.write("⏳ Élaboration du plan de jointure (Chain-of-Thought)...")
+                    with st.expander("📋 Voir le plan d'exécution", expanded=False):
+                        st.markdown(node_state.get("sql_plan"))
                 
                 elif node_name == "generate_sql":
                     status.write("⏳ Traduction en SQL...")
