@@ -47,22 +47,34 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
         
         final_summary = ""
         final_df = None
-        
+
         # Stream the execution
         for event in st.session_state.agent_graph.stream(initial_state, config=config):
             for node_name, node_state in event.items():
                 
-                if node_name == "generate_sql":
-                    status.write("⏳ Translating to SQL...")
+                if node_name == "reformulate_query":
+                    status.write("⏳ Reformulation de la question...")
+                    
+                elif node_name == "validate_query":
+                    is_answerable = node_state.get("is_answerable")
+                    if is_answerable:
+                        status.write("✅ Requête valide. Données présentes dans le schéma.")
+                    else:
+                        status.error("❌ Requête rejetée : Hors périmètre.")
+                        # On capture la raison du refus pour l'afficher à l'utilisateur
+                        final_summary = node_state.get("validation_reason", "Désolé, je ne peux pas répondre à cette question.")
+                
+                elif node_name == "generate_sql":
+                    status.write("⏳ Traduction en SQL...")
                     with st.expander("🔍 View Generated SQL", expanded=False):
                         st.code(node_state.get("sql_query"), language="sql")
                         
                 elif node_name == "execute_sql":
                     error = node_state.get("error")
                     if error:
-                        status.error(f"⚠️ SQL Error: {error}. Routing back to LLM to self-correct...")
+                        status.error(f"⚠️ Erreur SQL : {error}. Retour au LLM pour correction...")
                     else:
-                        status.write("⏳ Executing query on database...")
+                        status.write("⏳ Exécution sur la base de données...")
                         raw_data = node_state.get("raw_data", [])
                         if raw_data:
                             final_df = pd.DataFrame(raw_data)
@@ -70,8 +82,8 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
                                 st.dataframe(final_df, use_container_width=True)
                             
                 elif node_name == "summarize_results":
-                    status.write("⏳ Synthesizing final answer...")
-                    final_summary = node_state.get("summary")
+                    status.write("⏳ Synthèse de la réponse...")
+                    final_summary = node_state.get("summary")        
 
         status.update(label="✅ Task Completed!", state="complete", expanded=False)
         
