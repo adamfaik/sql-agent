@@ -1,0 +1,20 @@
+[
+    {
+        "id": 1,
+        "difficulty": "simple",
+        "question": "Combien y a-t-il de clients au total dans la base ?",
+        "gold_sql": "SELECT COUNT(*) FROM customers;"
+    },
+    {
+        "id": 2,
+        "difficulty": "complex",
+        "question": "Quel est le chiffre d'affaires total généré par la catégorie 'beauté et santé' ?",
+        "gold_sql": "SELECT SUM(oi.price) FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN category_translation ct ON p.product_category_name = ct.product_category_name WHERE ct.product_category_name_english = 'health_beauty';"
+    },
+    {
+        "id": 3,
+        "difficulty": "out_of_scope",
+        "question": "Quel est le nom du PDG d'Olist ?",
+        "gold_sql": null
+    }
+]
