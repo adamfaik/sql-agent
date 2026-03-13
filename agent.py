@@ -10,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
 from typing import TypedDict, List, Annotated, Literal
 from langchain_core.runnables.config import RunnableConfig
+import re
 
 # 1. Load environment variables from the .env file (API keys)
 load_dotenv()
@@ -268,10 +269,22 @@ def execute_sql(state: AgentState) -> dict:
     If it succeeds, it returns the data. If it fails, it returns the exact SQL error.
     """
     print("--- NODE: EXECUTING SQL ---")
-    query = state.get("sql_query")
+    sql_query = state.get("sql_query", "")
+
+    # --- STRICT SECURITY GUARDRAIL ---
+    # List of destructive keywords forbidden in read-only mode
+    forbidden_operations = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "REPLACE", "GRANT", "REVOKE"]
     
-    if not query:
-        return {"error": "No SQL query was generated."}
+    for op in forbidden_operations:
+        # \b ensures exact word matching (e.g., blocks "DROP" but allows a column named "drop_off_date")
+        if re.search(rf"\b{op}\b", sql_query, re.IGNORECASE):
+            security_error = f"Security Violation: '{op.upper()}' operation is strictly forbidden. Only SELECT queries are allowed."
+            print(f"🚨 ALERT: {security_error}")
+            
+            # Return the security error to force the agent to self-correct or abort
+            current_retries = state.get("retry_count", 0)
+            return {"error": security_error, "retry_count": current_retries + 1}
+    # --------------------------------------
         
     try:
         # Connect to the local SQLite database
