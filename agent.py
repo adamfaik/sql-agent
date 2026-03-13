@@ -25,6 +25,7 @@ class AgentState(TypedDict, total=False):
     db_results: str             # The raw data returned from the SQLite database
     raw_data: list              # Structured data for the Streamlit UI dataframe
     error: str                  # Any SQL execution error
+    retry_count: int            # Track the number of SQL correction attempts
     summary: str                # The final, business-friendly answer
     messages: Annotated[List[BaseMessage], add] 
 
@@ -222,28 +223,37 @@ def execute_sql(state: AgentState) -> dict:
                 
         print("✓ Execution successful. Data fetched.\n")
         # Return the results and clear any previous errors
-        return {"db_results": formatted_results, "raw_data": raw_data_list, "error": ""}
+        return {"db_results": formatted_results, "raw_data": raw_data_list, "error": "", "retry_count": 0}
         
     except Exception as e:
         # If SQLite throws an error (e.g., column doesn't exist, syntax error)
         error_msg = f"SQLite Error: {str(e)}"
         print(f"✗ Execution failed! {error_msg}\n")
-        return {"error": error_msg}
+        current_retries = state.get("retry_count", 0)
+        return {"error": error_msg, "retry_count": current_retries + 1}
 
 # 5. Define Node 3: Synthesizer / Summarizer
 def summarize_results(state: AgentState) -> dict:
     """
     Node 3: Takes the raw database results and translates them into a 
     clear, business-friendly summary using the LLM.
+    Handles the case where the SQL execution failed after maximum retries.
     """
     print("--- NODE: SUMMARIZING RESULTS ---")
-    question = state.get("query")
+    
+    # We use the standalone query if it exists, otherwise fallback to the original query
+    question = state.get("standalone_query", state.get("query"))
     raw_data = state.get("db_results")
     error = state.get("error")
     
-    # If there's an error and we ended up here somehow, handle it
+    # If there's an error and we ended up here, it means we reached the max retry limit (3/3)
     if error:
-        return {"summary": f"I couldn't answer the question due to an error: {error}"}
+        failure_msg = f"Désolé, je n'ai pas réussi à extraire ces données après plusieurs tentatives de correction automatique. Erreur technique finale : {error}"
+        print("✗ Max retries failed. Returning error summary.\n")
+        return {
+            "summary": failure_msg, 
+            "messages": [AIMessage(content=failure_msg)]
+        }
         
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
@@ -263,22 +273,32 @@ def summarize_results(state: AgentState) -> dict:
     
     print("✓ Summary successfully generated.\n")
     return {
-     "summary": summary, 
-     "messages": [AIMessage(content=summary)] # Save the AI's answer to memory
+        "summary": summary, 
+        "messages": [AIMessage(content=summary)] # Save the AI's answer to memory
     }
 
 # 6. Define the Routing Logic (Conditional Edge)
 def check_for_errors(state: AgentState) -> str:
     """
     Decides where the agent should go next after executing the SQL.
-    If there is an error, route back to the SQL Generator to fix it.
-    If successful, route to the Summarizer.
+    If there is an error, route back to the SQL Generator to fix it (max 3 times).
+    If the max retry limit is reached, route to the Summarizer to report the failure.
+    If successful, route directly to the Summarizer.
     """
     error = state.get("error")
+    retries = state.get("retry_count", 0)
+    
     if error:
-        print("--- ROUTING: ERROR DETECTED, RETRYING SQL GENERATION ---")
-        return "generate_sql"
+        # Check if we have hit the maximum number of allowed retries
+        if retries >= 3:
+            print(f"--- ROUTING: MAX RETRIES REACHED ({retries}/3). STOPPING LOOP. ---")
+            return "summarize_results"
+        else:
+            # We still have retries left, loop back to the SQL Generator
+            print(f"--- ROUTING: ERROR DETECTED, RETRYING SQL GENERATION (Attempt {retries}/3) ---")
+            return "generate_sql"
     else:
+        # No error means the SQL executed perfectly
         print("--- ROUTING: SUCCESS, PROCEEDING TO SUMMARY ---")
         return "summarize_results"
 

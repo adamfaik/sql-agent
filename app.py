@@ -72,9 +72,13 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
                 elif node_name == "execute_sql":
                     error = node_state.get("error")
                     if error:
-                        status.error(f"⚠️ Erreur SQL : {error}. Retour au LLM pour correction...")
+                        retries = node_state.get("retry_count", 1)
+                        if retries >= 3:
+                            status.error(f"❌ Échec définitif après 3 tentatives de correction ({error}).")
+                        else:
+                            status.warning(f"⚠️ Erreur SQL : {error}. Tentative de correction automatique ({retries}/3)...")
                     else:
-                        status.write("⏳ Exécution sur la base de données...")
+                        status.write("✅ Exécution réussie sur la base de données !")
                         raw_data = node_state.get("raw_data", [])
                         if raw_data:
                             final_df = pd.DataFrame(raw_data)
