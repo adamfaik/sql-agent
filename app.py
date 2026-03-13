@@ -1,70 +1,88 @@
 import streamlit as st
+import pandas as pd
+import uuid
 from agent import create_graph
+from langchain_core.messages import HumanMessage
 
-# 1. Page Configuration
 st.set_page_config(page_title="Olist Data Agent", page_icon="🤖", layout="wide")
 st.title("🤖 Olist Text-to-SQL Agent")
-st.markdown("Ask me anything about the Olist e-commerce database! I will translate your question into SQL, execute it, and summarize the results.")
+st.markdown("Ask me anything about the Olist e-commerce database! I can write SQL, execute it, self-correct errors, and analyze the results.")
 
-# 2. Initialize the LangGraph Agent in Streamlit's Session State
+# 1. Initialize session states
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = str(uuid.uuid4()) # Unique session ID for memory
+
 if "agent_graph" not in st.session_state:
     st.session_state.agent_graph = create_graph()
 
-# 3. Initialize UI Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 4. Display previous conversation history
+# 2. Display conversation history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        # If there's an attached dataframe in history, display it
+        if "dataframe" in msg:
+            st.dataframe(msg["dataframe"], use_container_width=True)
 
-# 5. Chat Input Area
-if prompt := st.chat_input("Ex: How many customers are in Sao Paulo?"):
+# 3. Chat Input
+if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue?"):
     
-    # Display the user's question immediately
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Agent Processing Area
     with st.chat_message("assistant"):
-        # Visual indicator of the pipeline steps
         status = st.status("🧠 Agent is thinking...", expanded=True)
         
-        initial_state = {"query": prompt}
-        final_summary = ""
+        initial_state = {
+            "query": prompt, 
+            "messages": [HumanMessage(content=prompt)] # Inject the question into the agent's memory
+            }
         
-        # 6. Stream the graph execution to capture intermediate results
-        # .stream() yields the output of each node as it finishes
-        for event in st.session_state.agent_graph.stream(initial_state):
+        # Configuration required for the Checkpointer to track this specific conversation
+        config = {"configurable": {"thread_id": st.session_state.thread_id}} 
+        
+        final_summary = ""
+        final_df = None
+        
+        # Stream the execution
+        for event in st.session_state.agent_graph.stream(initial_state, config=config):
             for node_name, node_state in event.items():
                 
-                # --- NODE 1: SQL GENERATION ---
                 if node_name == "generate_sql":
                     status.write("⏳ Translating to SQL...")
                     with st.expander("🔍 View Generated SQL", expanded=False):
-                        # Syntax highlighting for SQL
                         st.code(node_state.get("sql_query"), language="sql")
                         
-                # --- NODE 2: DATABASE EXECUTION ---
                 elif node_name == "execute_sql":
                     error = node_state.get("error")
                     if error:
-                        status.error(f"⚠️ SQL Error detected: {error}. Routing back to correct it...")
+                        status.error(f"⚠️ SQL Error: {error}. Routing back to LLM to self-correct...")
                     else:
                         status.write("⏳ Executing query on database...")
-                        with st.expander("📊 View Raw Database Results", expanded=False):
-                            st.text(node_state.get("db_results"))
+                        raw_data = node_state.get("raw_data", [])
+                        if raw_data:
+                            final_df = pd.DataFrame(raw_data)
+                            with st.expander("📊 View Raw Data", expanded=False):
+                                st.dataframe(final_df, use_container_width=True)
                             
-                # --- NODE 3: SUMMARIZATION ---
                 elif node_name == "summarize_results":
                     status.write("⏳ Synthesizing final answer...")
                     final_summary = node_state.get("summary")
 
-        # Update the status box when finished
         status.update(label="✅ Task Completed!", state="complete", expanded=False)
         
-        # 7. Display the final natural language response
+        # Display the interactive dataframe if data was retrieved
+        if final_df is not None and not final_df.empty:
+            st.dataframe(final_df, use_container_width=True)
+            
         st.markdown(final_summary)
-        st.session_state.messages.append({"role": "assistant", "content": final_summary})
+        
+        # Save assistant response to history
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": final_summary,
+            "dataframe": final_df # Keep the table in memory for UI scroll
+        })
