@@ -1,0 +1,15 @@
+# IA & LLM
+langchain
+langgraph
+langchain-openai
+
+# Base de données & Données
+pandas
+# sqlite3 est natif dans Python, pas besoin de l'installer
+
+# Interface web & Visualisation
+streamlit
+plotly
+
+# Utilitaires
+python-dotenv

@@ -3,6 +3,7 @@ import pandas as pd
 import uuid
 from agent import create_graph
 from langchain_core.messages import HumanMessage
+import plotly.express as px
 
 st.set_page_config(page_title="Olist Data Agent", page_icon="🤖", layout="wide")
 st.title("🤖 Olist Text-to-SQL Agent")
@@ -78,11 +79,29 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
         if final_df is not None and not final_df.empty:
             st.dataframe(final_df, use_container_width=True)
             
+            # --- NEW: AUTOMATIC DATA VISUALIZATION ---
+            # We only try to plot if there's more than 1 row and at least 2 columns
+            if len(final_df) > 1 and len(final_df.columns) >= 2:
+                # Auto-detect column types
+                numeric_cols = final_df.select_dtypes(include=['number']).columns.tolist()
+                categorical_cols = final_df.select_dtypes(exclude=['number']).columns.tolist()
+                
+                # If we have both categories and numbers, draw a chart!
+                if numeric_cols and categorical_cols:
+                    x_col = categorical_cols[0] # Use the first text column for the X axis
+                    y_col = numeric_cols[0]     # Use the first number column for the Y axis
+                    
+                    st.markdown(f"📊 **Visualisation : {y_col} par {x_col}**")
+                    
+                    # Create a beautiful interactive Bar Chart using Plotly
+                    fig = px.bar(
+                        final_df, 
+                        x=x_col, 
+                        y=y_col, 
+                        color=x_col,
+                        text_auto='.2s', # Show values on top of bars
+                        template="plotly_dark" # Matches Streamlit's dark mode nicely
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
         st.markdown(final_summary)
-        
-        # Save assistant response to history
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": final_summary,
-            "dataframe": final_df # Keep the table in memory for UI scroll
-        })
