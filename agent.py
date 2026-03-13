@@ -184,21 +184,38 @@ def generate_sql(state: AgentState) -> dict:
     # Temperature is set to 0 because we want deterministic, precise SQL code, not creativity
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     
-    # Craft the system prompt
+    # Define Few-Shot Examples to improve LLM accuracy (In-Context Learning)
+    few_shot_examples = """
+    --- FEW-SHOT EXAMPLES ---
+    Example 1 (Basic Aggregation & Filtering):
+    User: "Combien y a-t-il de clients dans la ville de sao paulo ?"
+    SQL: SELECT COUNT(customer_id) FROM customers WHERE customer_city = 'sao paulo';
+
+    Example 2 (Complex Joins & Language Translation):
+    User: "Quel est le top 3 des catégories avec le plus grand nombre d'articles vendus ?"
+    SQL: SELECT ct.product_category_name_english, COUNT(oi.order_item_id) AS total_items FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN category_translation ct ON p.product_category_name = ct.product_category_name GROUP BY ct.product_category_name_english ORDER BY total_items DESC LIMIT 3;
+
+    Example 3 (Date Handling in SQLite):
+    User: "Combien de commandes ont été livrées en 2018 ?"
+    SQL: SELECT COUNT(order_id) FROM orders WHERE order_status = 'delivered' AND strftime('%Y', order_delivered_customer_date) = '2018';
+    -------------------------
+    """
+
+    # Craft the main system prompt
     system_prompt = f"""You are an expert SQLite data analyst.
     Your task is to translate the user's question into a valid SQLite query.
     
     Here is the schema of the database:
     {schema}
     
-Rules:
+    {few_shot_examples}
+    
+    Rules:
     1. Return ONLY the raw SQL query.
     2. Do not wrap the SQL in markdown formatting (e.g., no ```sql).
     3. Do not add any explanations or text.
     4. Use JOINs correctly based on the provided schema.
-    5. CRITICAL LANGUAGE & FORMAT RULE: The database only stores category names in Portuguese (product_category_name) and English (product_category_name_english). 
-    Furthermore, the English names are ALWAYS formatted in lowercase with underscores instead of spaces (e.g., 'health_beauty', 'watches_gifts', 'bed_bath_table', 'sports_leisure'). 
-    If the chat history mentions categories in French, you MUST translate them to English AND format them with lowercase and underscores before putting them in the WHERE clause.
+    5. CRITICAL LANGUAGE & FORMAT RULE: The database only stores category names in Portuguese (product_category_name) and English (product_category_name_english). Furthermore, the English names are ALWAYS formatted in lowercase with underscores instead of spaces (e.g., 'health_beauty', 'watches_gifts'). If the chat history mentions categories in French, translate them to English AND format them with lowercase and underscores for the WHERE clause.
     """
     
     # Self-correction logic: if the state contains an error from a previous run
