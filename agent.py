@@ -9,6 +9,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
 from typing import TypedDict, List, Annotated, Literal
+from langchain_core.runnables.config import RunnableConfig
 
 # 1. Load environment variables from the .env file (API keys)
 load_dotenv()
@@ -41,7 +42,7 @@ class QueryClassification(BaseModel):
     reason: str = Field(description="Explain why this category was chosen.")
 
 # 2.5 Define Node: Contextualizer / Reformulator
-def reformulate_query(state: AgentState) -> dict:
+def reformulate_query(state: AgentState, config: RunnableConfig) -> dict:
     """
     Node 0: Analyzes the user's latest question and the conversation history.
     If the question refers to past context (e.g., "What about the second one?"),
@@ -50,13 +51,15 @@ def reformulate_query(state: AgentState) -> dict:
     print("--- NODE: REFORMULATING QUERY (CONTEXT MANAGEMENT) ---")
     query = state.get("query")
     messages = state.get("messages", [])
+
+    model_name = config.get("configurable", {}).get("model_name", "gpt-4o-mini")
     
     # If there is no history (just the current prompt), no need to reformulate
     if len(messages) <= 1:
         print("No history detected. Keeping original query.")
         return {"standalone_query": query}
         
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=model_name, temperature=0)
     
     # We extract the chat history (excluding the very last message which is the current query)
     history_text = "\n".join([f"{msg.type}: {msg.content}" for msg in messages[:-1]])
@@ -85,12 +88,14 @@ def reformulate_query(state: AgentState) -> dict:
     return {"standalone_query": rewritten_query}
 
 # 2.7 Define Node: Semantic Router (Classifier)
-def classify_query(state: AgentState) -> dict:
+def classify_query(state: AgentState, config: RunnableConfig) -> dict:
     """
     Node: Categorizes the query to determine the optimal execution path.
     """
     print("--- NODE: CLASSIFYING QUERY ---")
     query = state.get("standalone_query")
+
+    model_name = config.get("configurable", {}).get("model_name", "gpt-4o-mini")
     
     try:
         with open("schema.txt", "r", encoding="utf-8") as f:
@@ -98,7 +103,7 @@ def classify_query(state: AgentState) -> dict:
     except FileNotFoundError:
         schema = "Schema not found."
         
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=model_name, temperature=0)
     structured_llm = llm.with_structured_output(QueryClassification)
     
     system_prompt = f"""You are a Lead Data Architect routing SQL requests.
@@ -127,13 +132,15 @@ def classify_query(state: AgentState) -> dict:
     }
 
 # 2.8 Define Node: SQL Planner (For Complex Queries Only)
-def plan_sql_query(state: AgentState) -> dict:
+def plan_sql_query(state: AgentState, config: RunnableConfig) -> dict:
     """
     Node: Acts as a 'Chain-of-Thought' step. Writes a strategic plan of which 
     tables to join and what filters to apply before writing the actual SQL.
     """
     print("--- NODE: PLANNING COMPLEX SQL ---")
     query = state.get("standalone_query")
+
+    model_name = config.get("configurable", {}).get("model_name", "gpt-4o-mini")
     
     try:
         with open("schema.txt", "r", encoding="utf-8") as f:
@@ -141,7 +148,7 @@ def plan_sql_query(state: AgentState) -> dict:
     except FileNotFoundError:
         schema = "Schema not found."
         
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=model_name, temperature=0)
     
     system_prompt = f"""You are a Senior SQL Architect. 
     Before writing a complex query, you must plan the execution step-by-step.
@@ -163,13 +170,19 @@ def plan_sql_query(state: AgentState) -> dict:
     return {"sql_plan": plan}
 
 # 3. Define Node 1: SQL Generator
-def generate_sql(state: AgentState) -> dict:
+def generate_sql(state: AgentState, config: RunnableConfig) -> dict:
     """
     Node 1: Takes the user query and the database schema, 
     and uses an LLM to generate a valid SQLite query.
     If an error occurred in a previous step, it uses it to self-correct.
     """
     print("--- NODE: GENERATING SQL ---")
+
+    # Extract runtime configurations
+    configurable = config.get("configurable", {})
+    model_name = configurable.get("model_name", "gpt-4o-mini")
+    use_few_shot = configurable.get("use_few_shot", True)
+
     question = state.get("standalone_query")
     error = state.get("error", "")
     
@@ -180,9 +193,9 @@ def generate_sql(state: AgentState) -> dict:
     except FileNotFoundError:
         schema = "Schema file not found. Please run extract_schema.py first."
         
-    # Initialize the LLM (using gpt-4o-mini for speed and cost efficiency)
+    # Initialize the LLM with the specified model and temperature.
     # Temperature is set to 0 because we want deterministic, precise SQL code, not creativity
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=model_name, temperature=0)
     
     # Define Few-Shot Examples to improve LLM accuracy (In-Context Learning)
     few_shot_examples = """
@@ -217,6 +230,15 @@ def generate_sql(state: AgentState) -> dict:
     4. Use JOINs correctly based on the provided schema.
     5. CRITICAL LANGUAGE & FORMAT RULE: The database only stores category names in Portuguese (product_category_name) and English (product_category_name_english). Furthermore, the English names are ALWAYS formatted in lowercase with underscores instead of spaces (e.g., 'health_beauty', 'watches_gifts'). If the chat history mentions categories in French, translate them to English AND format them with lowercase and underscores for the WHERE clause.
     """
+
+    if use_few_shot:
+        few_shot_examples = """
+        --- FEW-SHOT EXAMPLES ---
+        Example 1 (Basic Aggregation & Filtering):
+        ... (garde tes exemples ici) ...
+        -------------------------
+        """
+        system_prompt += f"\n{few_shot_examples}\n"
     
     # Self-correction logic: if the state contains an error from a previous run
     if error:
@@ -289,7 +311,7 @@ def execute_sql(state: AgentState) -> dict:
         return {"error": error_msg, "retry_count": current_retries + 1}
 
 # 5. Define Node 3: Synthesizer / Summarizer
-def summarize_results(state: AgentState) -> dict:
+def summarize_results(state: AgentState, config: RunnableConfig) -> dict:
     """
     Node 3: Takes the raw database results and translates them into a 
     clear, business-friendly summary using the LLM.
@@ -301,6 +323,8 @@ def summarize_results(state: AgentState) -> dict:
     question = state.get("standalone_query", state.get("query"))
     raw_data = state.get("db_results")
     error = state.get("error")
+
+    model_name = config.get("configurable", {}).get("model_name", "gpt-4o-mini")
     
     # If there's an error and we ended up here, it means we reached the max retry limit (3/3)
     if error:
@@ -311,7 +335,7 @@ def summarize_results(state: AgentState) -> dict:
             "messages": [AIMessage(content=failure_msg)]
         }
         
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(model=model_name, temperature=0)
     
     system_prompt = """You are a helpful business data analyst. 
     You are provided with a user's original question and the raw data results from a SQL database.
@@ -334,7 +358,7 @@ def summarize_results(state: AgentState) -> dict:
     }
 
 # 6. Define the Routing Logic (Conditional Edge)
-def check_for_errors(state: AgentState) -> str:
+def check_for_errors(state: AgentState, config: RunnableConfig) -> str:
     """
     Decides where the agent should go next after executing the SQL.
     If there is an error, route back to the SQL Generator to fix it (max 3 times).
@@ -343,8 +367,17 @@ def check_for_errors(state: AgentState) -> str:
     """
     error = state.get("error")
     retries = state.get("retry_count", 0)
+
+    # Extract runtime config for self-correction
+    configurable = config.get("configurable", {})
+    use_self_correction = configurable.get("use_self_correction", True)
     
     if error:
+        # If self-correction is disabled, we skip straight to the summary with the error message
+        if not use_self_correction:
+            print("--- ROUTING: SELF-CORRECTION DISABLED. FORCING END. ---")
+            return "summarize_results"
+
         # Check if we have hit the maximum number of allowed retries
         if retries >= 3:
             print(f"--- ROUTING: MAX RETRIES REACHED ({retries}/3). STOPPING LOOP. ---")
