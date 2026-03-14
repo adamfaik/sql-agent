@@ -20,12 +20,36 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # 2. Display conversation history
-for msg in st.session_state.messages:
+for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        # If there's an attached dataframe in history, display it
-        if "dataframe" in msg:
-            st.dataframe(msg["dataframe"], use_container_width=True)
+        
+        # Redraw dataframes and charts for past messages
+        if msg.get("dataframe") is not None and not msg["dataframe"].empty:
+            df = msg["dataframe"]
+            c_type = msg.get("chart_type", "none")
+            
+            with st.expander("📊 View Raw Data", expanded=False):
+                st.dataframe(df, use_container_width=True)
+            
+            if c_type != "none" and len(df) > 1 and len(df.columns) >= 2:
+                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                categorical_cols = df.select_dtypes(exclude=['number']).columns.tolist()
+                
+                if numeric_cols and categorical_cols:
+                    x_col = categorical_cols[0] 
+                    y_col = numeric_cols[0]     
+                    
+                    if c_type == "bar":
+                        fig = px.bar(df, x=x_col, y=y_col, color=x_col, text_auto='.2s', template="plotly_dark")
+                        st.plotly_chart(fig, use_container_width=True, key=f"hist_bar_{i}")
+                    elif c_type == "pie":
+                        fig = px.pie(df, names=x_col, values=y_col, template="plotly_dark")
+                        st.plotly_chart(fig, use_container_width=True, key=f"hist_pie_{i}")
+                    elif c_type == "line":
+                        plot_df = df.sort_values(by=x_col)
+                        fig = px.line(plot_df, x=x_col, y=y_col, markers=True, template="plotly_dark")
+                        st.plotly_chart(fig, use_container_width=True, key=f"hist_line_{i}")
 
 # 3. Chat Input
 if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue?"):
@@ -47,6 +71,7 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
         
         final_summary = ""
         final_df = None
+        chart_type = "none"
 
         # Stream the execution
         for event in st.session_state.agent_graph.stream(initial_state, config=config):
@@ -94,38 +119,46 @@ if prompt := st.chat_input("Ex: What are the top 5 product categories by revenue
                                 st.dataframe(final_df, use_container_width=True)
                             
                 elif node_name == "summarize_results":
-                    status.write("⏳ Synthèse de la réponse...")
-                    final_summary = node_state.get("summary")        
+                    status.write("⏳ Synthèse de la réponse et choix du graphique...")
+                    final_summary = node_state.get("summary") 
+                    chart_type = node_state.get("chart_type", "none")       
 
         status.update(label="✅ Task Completed!", state="complete", expanded=False)
         
-        # Display the interactive dataframe if data was retrieved
+        # --- 1. DISPLAY TEXT SUMMARY FIRST ---
+        if final_summary:
+            st.markdown(final_summary)
+        
+        # --- 2. DISPLAY VISUALS & DOWNLOAD ---
         if final_df is not None and not final_df.empty:
-            st.dataframe(final_df, use_container_width=True)
+            with st.expander("📊 View Raw Data", expanded=False):
+                st.dataframe(final_df, use_container_width=True)
+                
+            csv_data = final_df.to_csv(index=False).encode('utf-8')
+            # Unique key required for download buttons generated in a loop/chat
+            st.download_button("📥 Download Data (CSV)", data=csv_data, file_name="olist_export.csv", mime="text/csv", key=f"dl_{len(st.session_state.messages)}")
             
-            # --- NEW: AUTOMATIC DATA VISUALIZATION ---
-            # We only try to plot if there's more than 1 row and at least 2 columns
-            if len(final_df) > 1 and len(final_df.columns) >= 2:
-                # Auto-detect column types
+            if chart_type != "none" and len(final_df) > 1 and len(final_df.columns) >= 2:
                 numeric_cols = final_df.select_dtypes(include=['number']).columns.tolist()
                 categorical_cols = final_df.select_dtypes(exclude=['number']).columns.tolist()
-                
-                # If we have both categories and numbers, draw a chart!
                 if numeric_cols and categorical_cols:
-                    x_col = categorical_cols[0] # Use the first text column for the X axis
-                    y_col = numeric_cols[0]     # Use the first number column for the Y axis
-                    
-                    st.markdown(f"📊 **Visualisation : {y_col} par {x_col}**")
-                    
-                    # Create a beautiful interactive Bar Chart using Plotly
-                    fig = px.bar(
-                        final_df, 
-                        x=x_col, 
-                        y=y_col, 
-                        color=x_col,
-                        text_auto='.2s', # Show values on top of bars
-                        template="plotly_dark" # Matches Streamlit's dark mode nicely
-                    )
+                    x_col = categorical_cols[0] 
+                    y_col = numeric_cols[0]     
+                    st.markdown(f"📊 **Visualization ({chart_type.upper()}): {y_col} by {x_col}**")
+                    if chart_type == "bar":
+                        fig = px.bar(final_df, x=x_col, y=y_col, color=x_col, text_auto='.2s', template="plotly_dark")
+                    elif chart_type == "pie":
+                        fig = px.pie(final_df, names=x_col, values=y_col, template="plotly_dark")
+                    elif chart_type == "line":
+                        plot_df = final_df.sort_values(by=x_col)
+                        fig = px.line(plot_df, x=x_col, y=y_col, markers=True, template="plotly_dark")
                     st.plotly_chart(fig, use_container_width=True)
                     
-        st.markdown(final_summary)
+        # --- 3. SAVE TO MEMORY FOR HISTORY ---
+        # Append the assistant's complete response to the session state
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": final_summary,
+            "dataframe": final_df,
+            "chart_type": chart_type
+        })
