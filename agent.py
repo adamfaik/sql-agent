@@ -297,12 +297,6 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
                     # Return the security error to force the agent to self-correct or abort
                     current_retries = state.get("retry_count", 0)
                     return {"error": security_error, "retry_count": current_retries + 1}
-                security_error = f"Security Violation: '{stmt_type}' operation detected. Only SELECT queries are strictly allowed."
-                print(f"🚨 ALERT: {security_error}")
-                
-                # Return the security error to force the agent to self-correct or abort
-                current_retries = state.get("retry_count", 0)
-                return {"error": security_error, "retry_count": current_retries + 1}
     # ----------------------------------------------
         
     try:
