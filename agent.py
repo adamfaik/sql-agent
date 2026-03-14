@@ -282,11 +282,21 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
     for statement in parsed_statements:
         # Ignore empty statements (like trailing semicolons or pure comments)
         if not statement.is_whitespace:
-            # get_type() returns the core command type (e.g., 'SELECT', 'DROP', 'UPDATE')
-            stmt_type = statement.get_type().upper()
+            # get_type() returns the core command type (e.g., 'SELECT', 'DROP') or None
+            raw_type = statement.get_type()
             
-            # Strict Read-Only policy: Only SELECT statements are allowed
-            if stmt_type != 'SELECT':
+            # Guard: If raw_type is None (e.g., pure comments), we ignore it safely
+            if raw_type:
+                stmt_type = raw_type.upper()
+                
+                # Strict Read-Only policy: Only SELECT statements are allowed
+                if stmt_type != 'SELECT':
+                    security_error = f"Security Violation: '{stmt_type}' operation detected. Only SELECT queries are strictly allowed."
+                    print(f"🚨 ALERT: {security_error}")
+                    
+                    # Return the security error to force the agent to self-correct or abort
+                    current_retries = state.get("retry_count", 0)
+                    return {"error": security_error, "retry_count": current_retries + 1}
                 security_error = f"Security Violation: '{stmt_type}' operation detected. Only SELECT queries are strictly allowed."
                 print(f"🚨 ALERT: {security_error}")
                 
