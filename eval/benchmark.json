@@ -50,5 +50,16 @@
     { "id": 47, "difficulty": "out_of_scope", "question": "Quelle est l'adresse exacte du principal entrepôt de stockage ?", "gold_sql": null },
     { "id": 48, "difficulty": "out_of_scope", "question": "Quel est le cours de l'action en bourse d'Olist aujourd'hui ?", "gold_sql": null },
     { "id": 49, "difficulty": "out_of_scope", "question": "Peux-tu me donner le numéro de téléphone personnel du vendeur ID 12345 ?", "gold_sql": null },
-    { "id": 50, "difficulty": "out_of_scope", "question": "Quel est le taux de rebond du site web e-commerce ?", "gold_sql": null }
+    { "id": 50, "difficulty": "out_of_scope", "question": "Quel est le taux de rebond du site web e-commerce ?", "gold_sql": null },
+
+    { "id": 51, "difficulty": "ambiguous", "question": "Montre-moi les meilleurs vendeurs.", "gold_sql": null },
+    { "id": 52, "difficulty": "ambiguous", "question": "Quels sont les bons produits dans le catalogue ?", "gold_sql": null },
+    { "id": 53, "difficulty": "ambiguous", "question": "Affiche les performances de l'entreprise pour l'année dernière.", "gold_sql": null },
+    { "id": 54, "difficulty": "ambiguous", "question": "Donne-moi les pires commandes du mois dernier.", "gold_sql": null },
+    { "id": 55, "difficulty": "ambiguous", "question": "Je veux voir les clients les plus fidèles.", "gold_sql": null },
+    { "id": 56, "difficulty": "ambiguous", "question": "Quelles catégories de produits marchent bien ?", "gold_sql": null },
+    { "id": 57, "difficulty": "ambiguous", "question": "Affiche les villes avec une bonne activité de vente.", "gold_sql": null },
+    { "id": 58, "difficulty": "ambiguous", "question": "Show me the top products.", "gold_sql": null },
+    { "id": 59, "difficulty": "ambiguous", "question": "Quel est le profil type de nos clients ?", "gold_sql": null },
+    { "id": 60, "difficulty": "ambiguous", "question": "Fais un bilan global des livraisons.", "gold_sql": null }
 ]
