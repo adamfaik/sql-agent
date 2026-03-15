@@ -10,6 +10,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 import uuid
 import time
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- Pydantic Model for the Judge ---
 class JudgeOutput(BaseModel):
@@ -136,7 +139,7 @@ if st.button("🚀 Run Evaluation Benchmark", type="primary"):
                 # Safe connection handling (prevents memory leaks)
                 conn = None
                 try:
-                    conn = sqlite3.connect("olist.db")
+                    conn = sqlite3.connect("data/olist.db")
                     cursor = conn.cursor()
                     cursor.execute(generated_sql)
                     agent_results = cursor.fetchall()

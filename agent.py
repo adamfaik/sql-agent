@@ -58,7 +58,7 @@ def get_schema() -> str:
     """
     print("⚙️ Loading schema into memory cache...")
     try:
-        with open("schema.txt", "r", encoding="utf-8") as f:
+        with open("data/schema.txt", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return "Schema file not found."
@@ -303,7 +303,7 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
     
     try:
         # Connect to the local SQLite database
-        conn = sqlite3.connect("olist.db")
+        conn = sqlite3.connect("data/olist.db")
         cursor = conn.cursor()
         
         # --- TIMEOUT MECHANISM (Anti-Cross Join) ---
