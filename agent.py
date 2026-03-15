@@ -502,12 +502,13 @@ def create_graph():
     workflow.add_edge("reformulate_query", "classify_query")
     
     # Advanced Semantic Router
-    def route_after_classification(state: AgentState, config: dict) -> str:
+    # se 'RunnableConfig' as type hint so LangGraph knows to inject it automatically
+    def route_after_classification(state: AgentState, config: RunnableConfig) -> str:
         cat = state.get("query_complexity")
 
-        # Read the ablation study flag
-        # This allows us to disable the planner during evaluation to measure its impact on performance and accuracy.
-        use_cot_planner = config.get("configurable", {}).get("use_cot_planner", True)
+        # Read the ablation study flag safely
+        safe_config = config or {}
+        use_cot_planner = safe_config.get("configurable", {}).get("use_cot_planner", True)
 
         if cat == "out_of_scope":
             print("--- ROUTING: OUT OF SCOPE. ENDING. ---")
