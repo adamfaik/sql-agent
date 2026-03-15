@@ -262,6 +262,10 @@ if st.button("🚀 Run Evaluation Benchmark", type="primary"):
         
         # Update progress
         progress_bar.progress((i + 1) / total_questions)
+        
+        # Rate Limit Prevention: Add a short delay after each question, especially for more powerful models
+        if model_choice == "gpt-4o":
+            time.sleep(12)
 
     status_text.success("✅ Evaluation Complete!")
     

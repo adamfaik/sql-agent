@@ -1,0 +1,68 @@
+ID,Difficulty,Accurate (Strict),Judge Score (/3),Judge Reason,Valid SQL,Retries Triggered,Final Error
+1,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected total number of clients.",✅ Yes,0,None
+2,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query is semantically correct and retrieves the total number of orders as requested by the user.",✅ Yes,0,None
+3,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+4,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was semantically correct and returned the expected data.",✅ Yes,0,None
+5,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected count of orders with the status 'canceled'.",✅ Yes,0,None
+6,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected average price.",✅ Yes,0,None
+7,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected average weight of the products.",✅ Yes,0,None
+8,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+9,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the correct maximum payment value.",✅ Yes,0,None
+10,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected average freight value.",✅ Yes,0,None
+11,simple,❌ No,0,No SQL query was provided by the agent for evaluation.,❌ No,0,None
+12,simple,❌ No,0,"No SQL result was provided by the agent, making it impossible to evaluate the correctness of the query.",❌ No,3,SQLite Error: Execution timed out after 5.0 seconds. Your query is too slow. Check for missing ON clauses in your JOINs (Cartesian products).
+13,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was semantically correct and returned the expected maximum number of payment installments.",✅ Yes,0,None
+14,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected count of products with a weight greater than 10,000 grams.",✅ Yes,0,None
+15,simple,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected count of orders with the status 'delivered'.",✅ Yes,0,None
+16,complex,❌ No,1,"The agent's SQL result is significantly different from the gold SQL result, indicating a potential error in logic or aggregation. However, the agent's query is related to the user's question, suggesting it queried the right tables but applied incorrect logic.",✅ Yes,0,None
+17,complex,❌ No,3,"The agent's SQL result is semantically correct as it returns the same top 5 product categories with identical revenue figures as the gold SQL result. The difference is only in the language of the category names, which does not affect the correctness of the data.",✅ Yes,0,None
+18,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+19,complex,❌ No,2,"The agent correctly identified the top 3 client IDs who spent the most money, but failed to include the expenditure amounts in the result. This omission makes the result partially correct as it lacks complete information.",✅ Yes,0,None
+20,complex,❌ No,2,"The agent's SQL result is close to the gold result, indicating that the query logic is mostly correct. However, the slight difference in the average weight suggests a possible minor discrepancy in filtering or aggregation, such as an additional or missing condition.",✅ Yes,0,None
+21,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was semantically correct and returned the expected data.",✅ Yes,0,None
+22,complex,❌ No,2,"The agent's SQL result correctly identifies the top 3 sellers by their IDs, which aligns with the user's request to display the top 3 sellers. However, it lacks the cumulative sales figures, which are crucial for determining the top sellers based on revenue. Thus, the result is partially correct.",✅ Yes,0,None
+23,complex,❌ No,0,No SQL query was provided by the agent to evaluate its correctness.,❌ No,0,None
+24,complex,❌ No,2,"The agent's SQL result is in the right direction, querying for revenue, but it seems to have missed some data or applied incorrect filters/aggregations, resulting in a different total.",✅ Yes,0,None
+25,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+26,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected average price for the specified category.",✅ Yes,0,None
+27,complex,❌ No,1,"The agent's SQL result is significantly different from the expected result, indicating a major error in logic or filtering. However, the agent likely queried the correct tables, as the result is a numerical count, which is related to the user's question about the number of delivered orders.",✅ Yes,0,None
+28,complex,❌ No,1,"The agent's SQL result is related to the user's question as it involves querying categories of products. However, the logic is incorrect as it does not identify the category with the heaviest average weight, which is 'furniture_mattress_and_upholstery' with an average weight of 13190.0. The agent's result 'office_furniture' does not match the expected outcome.",✅ Yes,0,None
+29,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+30,complex,❌ No,0,No SQL query was provided by the agent for evaluation.,❌ No,3,SQLite Error: no such table: payments
+31,complex,❌ No,2,"The agent's SQL result correctly identifies the top 5 seller IDs with the most orders, matching the IDs in the gold SQL result. However, it lacks the order count associated with each seller, which is a crucial part of the query's intent. Thus, it is partially correct.",✅ Yes,1,None
+32,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was semantically correct and returned the expected data.",✅ Yes,0,None
+33,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query logic is correct and retrieves the correct client ID for the order with the most items.",✅ Yes,0,None
+34,complex,❌ No,2,"The agent's SQL result is in the right direction, as it attempts to calculate the average payment value per order. However, the result differs from the expected value, indicating a possible issue with the aggregation logic or missing filters.",✅ Yes,0,None
+35,complex,❌ No,0,"No SQL was generated by the agent, making it impossible to evaluate the correctness of the SQL answer.",❌ No,0,None
+36,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was semantically correct and returned the expected data.",✅ Yes,0,None
+37,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected data.",✅ Yes,0,None
+38,complex,❌ No,0,No SQL query was provided by the agent to evaluate its correctness.,❌ No,0,None
+39,complex,✅ Yes,3,"The agent's SQL result matches the gold SQL result exactly, indicating that the query was executed correctly and returned the expected average size of photos for the 'téléphonie' category.",✅ Yes,0,None
+40,complex,❌ No,1,"The agent's SQL result is incorrect as it returns a different order ID than the expected result. However, it is related to the user's question as it likely queries the correct tables and attempts to find an order ID based on payment installments.",✅ Yes,0,None
+41,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+42,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+43,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+44,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+45,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+46,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+47,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+48,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+49,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+50,out_of_scope,✅ Yes,3,Out-of-scope detection: correct classification.,✅ Yes,0,None
+51,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data to evaluate. Without an attempt to interpret the ambiguous question, it is impossible to assess the logic or reasonableness of the agent's approach.",❌ No,0,None
+52,ambiguous,❌ No,0,"The agent did not generate any SQL, making it impossible to evaluate the logic or reasonableness of its interpretation.",❌ No,0,None
+53,ambiguous,❌ No,0,"The agent did not generate any SQL results, making it impossible to evaluate the logic or reasonableness of its interpretation. Without any SQL output, the agent's response cannot be assessed for validity or relevance to the ambiguous question.",❌ No,0,None
+54,ambiguous,❌ No,0,"The agent did not generate any SQL results, making it impossible to evaluate the logic or reasonableness of its interpretation. Without any SQL output, the agent's response cannot be assessed for validity or business interpretation.",❌ No,0,None
+55,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data output. Without an attempt to interpret the ambiguous question, it is impossible to evaluate the logic or reasonableness of the SQL.",❌ No,0,None
+56,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data output. Without an attempt to interpret the ambiguous question, it is impossible to evaluate the logic or reasonableness of the agent's approach.",❌ No,0,None
+57,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data output. Without an attempt to interpret the ambiguous question, it is impossible to evaluate the logic or reasonableness of the SQL.",❌ No,0,None
+58,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data to evaluate. Without an attempt to interpret the ambiguous question, it is impossible to assess the logic or reasonableness of the agent's approach.",❌ No,0,None
+59,ambiguous,❌ No,0,"The agent did not generate any SQL, resulting in no data output. Without an attempt to interpret the ambiguous question or provide a SQL query, it is impossible to evaluate the logic or reasonableness of the agent's approach. Therefore, the score is 0.",❌ No,0,None
+60,ambiguous,❌ No,3,"The agent's SQL query provides a comprehensive overview of deliveries, aligning well with the ambiguous request for a 'global assessment of deliveries.' It includes:
+
+1. **Total Orders**: Counts all orders, which is a fundamental metric for any delivery assessment.
+2. **Delivered vs. In-Transit Orders**: Differentiates between completed and pending deliveries, offering insight into the current state of operations.
+3. **Average Delivery Time**: Calculates the average time taken for deliveries, a critical performance metric.
+4. **Average Delay**: Measures the deviation from estimated delivery dates, highlighting efficiency and reliability.
+
+The SQL is logically structured, joins necessary tables, and uses appropriate functions to derive meaningful metrics. The result set is coherent, providing a snapshot of delivery performance. Thus, the agent's interpretation and execution are highly reasonable.",✅ Yes,0,None
