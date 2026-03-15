@@ -297,31 +297,33 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
                     # Return the security error to force the agent to self-correct or abort
                     current_retries = state.get("retry_count", 0)
                     return {"error": security_error, "retry_count": current_retries + 1}
-    # ----------------------------------------------
         
+    # Initialize conn to None so it exists in the local scope for the finally block
+    conn = None
+    
     try:
         # Connect to the local SQLite database
         conn = sqlite3.connect("olist.db")
         cursor = conn.cursor()
         
-        # --- NEW: TIMEOUT MECHANISM (Anti-Cross Join) ---
+        # --- TIMEOUT MECHANISM (Anti-Cross Join) ---
         start_time = time.time()
-        TIMEOUT_SECONDS = 5.0 # Temps maximum autorisé en secondes
+        TIMEOUT_SECONDS = 5.0 # Max allowed time in seconds
         
         def progress_handler():
-            # Si le temps écoulé dépasse la limite, on retourne 1 pour forcer l'arrêt
+            # If elapsed time exceeds limit, return 1 to force abort
             if time.time() - start_time > TIMEOUT_SECONDS:
                 return 1 
             return 0
             
-        # SQLite appellera cette fonction toutes les 10 000 instructions internes
+        # SQLite will call this function every 10,000 internal instructions
         conn.set_progress_handler(progress_handler, 10000)
         # ------------------------------------------------
         
         # Execute the SQL query
         cursor.execute(sql_query)
         
-        # Désactiver le handler une fois la requête terminée
+        # Disable the progress handler once the query is done
         conn.set_progress_handler(None, 0)
         
         # Fetch results (limiting to 100 to avoid blowing up the LLM context later)
@@ -329,8 +331,7 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
         
         # Extract column names for better readability
         column_names = [description[0] for description in cursor.description]
-        conn.close()
-
+        
         # Create a structured list of dictionaries for Streamlit
         raw_data_list = [dict(zip(column_names, row)) for row in results]
         
@@ -386,6 +387,12 @@ def execute_sql(state: AgentState, config: RunnableConfig) -> dict:
         print(f"✗ Execution failed! {error_msg}\n")
         current_retries = state.get("retry_count", 0)
         return {"error": error_msg, "retry_count": current_retries + 1}
+        
+    finally:
+        # --- Guaranteed Connection Cleanup ---
+        # This block ALWAYS executes, whether the try succeeds or raises an exception
+        if conn:
+            conn.close()
 
 # 5. Define Node 3: Synthesizer / Summarizer
 def summarize_results(state: AgentState, config: RunnableConfig) -> dict:
@@ -495,14 +502,23 @@ def create_graph():
     workflow.add_edge("reformulate_query", "classify_query")
     
     # Advanced Semantic Router
-    def route_after_classification(state: AgentState) -> str:
+    def route_after_classification(state: AgentState, config: dict) -> str:
         cat = state.get("query_complexity")
+
+        # Read the ablation study flag
+        # This allows us to disable the planner during evaluation to measure its impact on performance and accuracy.
+        use_cot_planner = config.get("configurable", {}).get("use_cot_planner", True)
+
         if cat == "out_of_scope":
             print("--- ROUTING: OUT OF SCOPE. ENDING. ---")
             return END
         elif cat == "complex":
-            print("--- ROUTING: COMPLEX QUERY. GOING TO PLANNER. ---")
-            return "plan_sql_query"
+            if use_cot_planner:
+                print("--- ROUTING: COMPLEX QUERY. CoT PLANNER ENABLED. GOING TO PLANNER. ---")
+                return "plan_sql_query"
+            else:
+                print("--- ROUTING: COMPLEX QUERY. CoT PLANNER DISABLED. GOING DIRECTLY TO SQL. ---")
+                return "generate_sql"
         else: # simple
             print("--- ROUTING: SIMPLE QUERY. GOING DIRECTLY TO SQL. ---")
             return "generate_sql"
