@@ -128,5 +128,18 @@
         "Valid SQL Rate (%)": 75.0,
         "Self-Corrections": 1,
         "Avg Time/Q (s)": 4.15
+    },
+    {
+        "Run ID": "d031f9e3",
+        "Timestamp": "2026-03-15 16:47:43",
+        "Model": "gpt-4o",
+        "Few-Shot": true,
+        "Self-Correction": false,
+        "CoT Planner": false,
+        "Strict Accuracy (%)": 76.7,
+        "Semantic Accuracy (%)": 88.3,
+        "Valid SQL Rate (%)": 93.3,
+        "Self-Corrections": 0,
+        "Avg Time/Q (s)": 15.45
     }
 ]
