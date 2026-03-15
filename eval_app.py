@@ -121,9 +121,31 @@ if st.button("🚀 Run Evaluation Benchmark", type="primary"):
         # Metric 2: Execution Accuracy (Does the output match the Gold SQL?)
         is_accurate = False
         
-        if item["difficulty"] == "out_of_scope":
+        if item.get("difficulty") == "out_of_scope":
             # Success for out_of_scope is correctly identifying it and NOT generating SQL
             is_accurate = (complexity == "out_of_scope")
+            
+        elif item.get("difficulty") == "ambiguous":
+            # --- Ambiguous queries have no exact "Gold" answer ---
+            # We execute the agent's SQL to see if it works, but we DO NOT compare it
+            is_accurate = False # Strict match is fundamentally N/A for ambiguity
+            if is_valid_sql:
+                valid_sql_count += 1
+                if retries > 0:
+                    self_corrected_count += 1
+                # Safe connection handling (prevents memory leaks)
+                conn = None
+                try:
+                    conn = sqlite3.connect("olist.db")
+                    cursor = conn.cursor()
+                    cursor.execute(generated_sql)
+                    agent_results = cursor.fetchall()
+                except Exception:
+                    pass
+                finally:
+                    # Guarantee connection closure even if fetchall() fails
+                    if conn:
+                        conn.close()
             
         elif is_valid_sql:
             valid_sql_count += 1
@@ -163,6 +185,35 @@ if st.button("🚀 Run Evaluation Benchmark", type="primary"):
             judge_score = 3 if is_accurate else 0
             judge_reason = "Out-of-scope detection: correct classification." if is_accurate else "Failed to identify out-of-scope query."
             
+        elif item.get("difficulty") == "ambiguous":
+            # --- FIX: Special Judge Prompt for Ambiguity ---
+            judge_llm = ChatOpenAI(model="gpt-4o", temperature=0) 
+            structured_judge = judge_llm.with_structured_output(JudgeOutput)
+            
+            agent_str = str(agent_results[:5]) if agent_results else "No Agent results"
+            
+            judge_prompt = f"""You are an impartial SQL evaluation judge.
+            The user asked an AMBIGUOUS question: "{item.get('question', 'N/A')}"
+            There is no single correct 'Gold SQL' because the question is open to interpretation (e.g., 'best' could mean highest revenue, largest volume, or best ratings).
+            
+            Agent generated SQL: {generated_sql}
+            Agent SQL result (first 5 rows): {agent_str}
+            
+            Score the agent on a scale of 0 to 3 based on the LOGIC and REASONABLENESS of its assumption:
+            - 3: Highly reasonable business interpretation and valid SQL returning data.
+            - 2: Plausible interpretation but minor SQL flaw or weird sorting.
+            - 1: Poor interpretation but valid SQL.
+            - 0: Completely illogical interpretation or invalid/no SQL generated.
+            """
+            
+            try:
+                judge_res = structured_judge.invoke([HumanMessage(content=judge_prompt)])
+                judge_score = judge_res.score
+                judge_reason = judge_res.reason
+            except Exception as e:
+                judge_score = 0
+                judge_reason = f"Judge Evaluation Error: {str(e)}"
+
         else:
             # Standard evaluation for actual SQL queries
             # We use a structured output to guarantee valid JSON formatting
