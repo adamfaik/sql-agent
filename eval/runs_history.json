@@ -141,5 +141,18 @@
         "Valid SQL Rate (%)": 93.3,
         "Self-Corrections": 0,
         "Avg Time/Q (s)": 15.45
+    },
+    {
+        "Run ID": "630fff3c",
+        "Timestamp": "2026-03-21 22:51:18",
+        "Model": "gpt-3.5-turbo",
+        "Few-Shot": false,
+        "Self-Correction": false,
+        "CoT Planner": false,
+        "Strict Accuracy (%)": 16.7,
+        "Semantic Accuracy (%)": 17.2,
+        "Valid SQL Rate (%)": 78.3,
+        "Self-Corrections": 0,
+        "Avg Time/Q (s)": 2.83
     }
 ]
